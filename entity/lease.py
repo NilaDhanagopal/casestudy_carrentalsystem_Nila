@@ -1,11 +1,19 @@
 class Lease:
-    def __init__(self, leaseID=0, vehicleID=0, customerID=0, startDate="", endDate="", leaseType=""):
+    def __init__(self, leaseID=0, vehicleID=0, customerID=0, startDate="", endDate="", leaseType="",active=True):
         self.__leaseID = leaseID
         self.__vehicleID = vehicleID
         self.__customerID = customerID
         self.__startDate = startDate
         self.__endDate = endDate
         self.__leaseType = leaseType  # "DailyLease" or "MonthlyLease"
+        self.__active = active  # ✅ Add this
+
+        # Add getter/setter for active
+        def is_active(self):
+            return self.__active
+
+        def set_active(self, active):
+            self.__active = active
 
     # Getters
     def get_leaseID(self):

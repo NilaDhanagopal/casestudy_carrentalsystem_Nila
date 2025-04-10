@@ -31,7 +31,8 @@ def main():
             last_name = input("Last Name: ")
             email = input("Email: ")
             phone = input("Phone Number: ")
-            customer = Customer(first_name=first_name, last_name=last_name, email=email, phone_number=phone)
+            customer = Customer(firstName=first_name, lastName=last_name, email=email, phoneNumber=phone)
+
             repo.addCustomer(customer)
 
         elif choice == '2':
@@ -42,10 +43,11 @@ def main():
             daily_rate = float(input("Daily Rate: "))
             status = input("Status (available/notAvailable): ")
             passenger_capacity = int(input("Passenger Capacity: "))
-            engine_capacity = int(input("Engine Capacity (cc): "))
-            vehicle = Vehicle(make=make, model=model, year=year, daily_rate=daily_rate,
-                              status=status, passenger_capacity=passenger_capacity,
-                              engine_capacity=engine_capacity)
+            engine_capacity = float(input("Engine Capacity (cc): "))
+            vehicle = Vehicle(make=make, model=model, year=year, dailyRate=daily_rate,  # Use 'dailyRate' here
+                              status=status, passengerCapacity=passenger_capacity,
+                              engineCapacity=engine_capacity)
+
             repo.addCar(vehicle)
 
         elif choice == '3':
@@ -58,10 +60,10 @@ def main():
             print("\n--- Create Lease ---")
             try:
                 customer_id = int(input("Customer ID: "))
-                car_id = int(input("Car ID: "))
+                vehicleID = int(input("Car ID: "))
                 start_date = input("Start Date (YYYY-MM-DD): ")
                 end_date = input("End Date (YYYY-MM-DD): ")
-                lease = repo.createLease(customer_id, car_id, start_date, end_date)
+                lease = repo.createLease(customer_id, vehicleID, start_date, end_date)
                 print("Lease Created:", lease)
             except Exception as e:
                 print(" Error:", e)
@@ -75,13 +77,18 @@ def main():
             except Exception as e:
                 print("Error:", e)
 
+
         elif choice == '6':
             print("\n--- Record Payment ---")
-            lease_id = int(input("Lease ID: "))
+            leaseId = int(input("Lease ID: "))
             amount = float(input("Payment Amount: "))
             try:
-                repo.recordPayment(lease_id, amount)
-                print("Payment Recorded.")
+                lease = repo.findLeaseById(leaseId)  # Fetch the Lease object by leaseId
+                if lease:  # Check if the Lease object exists
+                    repo.recordPayment(lease, amount)  # Pass the Lease object to recordPayment
+                    print("Payment Recorded.")
+                else:
+                    print("Lease not found.")
             except Exception as e:
                 print("Error:", e)
 
