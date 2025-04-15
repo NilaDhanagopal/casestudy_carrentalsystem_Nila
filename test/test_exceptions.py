@@ -1,6 +1,10 @@
 import unittest
 from dao.ICarLeaseRepositoryImpl import CarLeaseRepositoryImpl
-from exceptions import CarNotFoundException, LeaseNotFoundException, CustomerNotFoundException
+
+from exceptions.CustomerNotFoundException import CustomerNotFoundException
+from exceptions.CarNotFoundException import CarNotFoundException
+from exceptions.LeaseNotFoundException import LeaseNotFoundException
+
 
 class TestExceptions(unittest.TestCase):
 

@@ -8,7 +8,7 @@ from datetime import date
 
 class ICarLeaseRepository(ABC):
 
-    # 🚗 Car Management
+    # car Management
     @abstractmethod
     def addCar(self, car: Vehicle) -> None:
         pass
@@ -29,7 +29,7 @@ class ICarLeaseRepository(ABC):
     def findCarById(self, carID: int) -> Vehicle:
         pass
 
-    # 👤 Customer Management
+    # Customer Management
     @abstractmethod
     def addCustomer(self, customer: Customer) -> None:
         pass
@@ -46,7 +46,7 @@ class ICarLeaseRepository(ABC):
     def findCustomerById(self, customerID: int) -> Customer:
         pass
 
-    # 📄 Lease Management
+    #  Lease Management
     @abstractmethod
     def createLease(self, customerID: int, carID: int, startDate: date, endDate: date) -> Lease:
         pass
@@ -63,7 +63,7 @@ class ICarLeaseRepository(ABC):
     def listLeaseHistory(self) -> list:
         pass
 
-    # 💵 Payment Handling
+    #  Payment Handling
     @abstractmethod
     def recordPayment(self, lease: Lease, amount: float) -> None:
         pass

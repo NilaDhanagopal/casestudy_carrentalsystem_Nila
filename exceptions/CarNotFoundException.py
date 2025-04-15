@@ -4,7 +4,7 @@ class CarNotFoundException(Exception):
         super().__init__(self.message)
 
 
-try:
+""""try:
     raise CarNotFoundException("Test")
 except CarNotFoundException as e:
-    print("Caught exception:", e)
+    print("Caught exception:", e)"""

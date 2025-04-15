@@ -2,17 +2,21 @@ from dao.ICarLeaseRepository import ICarLeaseRepository
 from entity.vehicle import Vehicle
 from entity.customer import Customer
 from entity.lease import Lease
+from exceptions.CustomerNotFoundException import CustomerNotFoundException
 from exceptions.CarNotFoundException import CarNotFoundException
-from util.DBConnection import DBConnection  # ✅ Correct import
+from exceptions.LeaseNotFoundException import LeaseNotFoundException
+from exceptions.invalid_customer_detail_exception import InvalidEmailException, InvalidPhoneNumberException
+from util.validators import validate_email, validate_phone
+from util.DBConnection import DBConnection
 from datetime import date
 import mysql.connector
 
 class CarLeaseRepositoryImpl(ICarLeaseRepository):
 
     def __init__(self):
-        self.connection = DBConnection.getConnection()  # ✅ Correct usage
+        self.connection = DBConnection.getConnection()  #
 
-    # 🚗 Car Management Methods
+    #  Car Management Methods
     def addCar(self, car):
         cursor = self.connection.cursor()
 
@@ -29,14 +33,14 @@ class CarLeaseRepositoryImpl(ICarLeaseRepository):
 
         self.connection.commit()  # Commit the transaction to the database
 
-        print("✅ Car added successfully.")
+        print(" Car added successfully.")
 
     def removeCar(self, carID: int) -> None:
         cursor = self.connection.cursor()
         query = "DELETE FROM vehicle WHERE vehicleID = %s"
         cursor.execute(query, (carID,))
         self.connection.commit()
-        print("✅ Car removed successfully.")
+        print(" Car removed successfully.")
 
     def listAvailableCars(self) -> list:
         cursor = self.connection.cursor()
@@ -50,100 +54,152 @@ class CarLeaseRepositoryImpl(ICarLeaseRepository):
         cursor.execute(query)
         return cursor.fetchall()
 
-    def findCarById(self, carID: int) -> Vehicle:
+    from exceptions.CarNotFoundException import CarNotFoundException
+    def findCarById(self, vehicleID: int) -> Vehicle:
         cursor = self.connection.cursor()
-        query = "SELECT vehicleID, make, model, year, dailyRate, status, passengerCapacity, engineCapacity FROM vehicle WHERE vehicleID = %s"
-        cursor.execute(query, (carID,))
+        cursor.execute("SELECT * FROM vehicle WHERE vehicleID = %s", (vehicleID,))
         row = cursor.fetchone()
-        if row:
-            vehicle = Vehicle(*row[1:])
-            vehicle.set_vehicleID(row[0])
-            return vehicle
-        else:
-            print(f"Car with ID {carID} not found. Raising exception.")  # Debug log
-            raise CarNotFoundException(f"Car with ID {carID} not found.")  # This should be raised
+        if not row:
+            raise CarNotFoundException(f"Car with ID {vehicleID} not found.")
 
-            # 👤 Customer Management Methods
-    def addCustomer(self, customer: Customer) -> None:
-        cursor = self.connection.cursor()
-        # Correct query (3 placeholders, no customer_id)
-        query = "INSERT INTO customer (firstName, lastName, email, phoneNumber) VALUES (%s, %s, %s, %s)"
-        data = (
-            customer.get_firstName(), customer.get_lastName(),
-            customer.get_email(), customer.get_phoneNumber()
+        # Unpack correctly
+        vehicle = Vehicle(
+            make=row[1],
+            model=row[2],
+            year=row[3],
+            dailyRate=row[4],
+            status=row[5],
+            passengerCapacity=row[6],
+            engineCapacity=row[7]
         )
+        vehicle.set_vehicleID(row[0])  # Set vehicleID separately
+        return vehicle
 
-        cursor.execute(query, data)
-        self.connection.commit()
-        print("✅ Customer added successfully.")
+        #  Customer Management Methods
+
+    def addCustomer(self, customer: Customer) -> None:
+        try:
+            # Validate email and phone before adding the customer
+            validate_email(customer.get_email())  # Ensure this raises an exception if invalid
+            validate_phone(customer.get_phoneNumber())  # Ensure this raises an exception if invalid
+
+            cursor = self.connection.cursor()
+
+            # Insert customer into the database
+            query = "INSERT INTO customer (firstName, lastName, email, phoneNumber) VALUES (%s, %s, %s, %s)"
+            data = (
+                customer.get_firstName(), customer.get_lastName(),
+                customer.get_email(), customer.get_phoneNumber()
+            )
+
+            cursor.execute(query, data)
+            self.connection.commit()
+            print("Customer added successfully.")
+
+        except InvalidEmailException as e:
+            print(f"❌ {e}")  # If email is invalid, it will print the error
+        except InvalidPhoneNumberException as e:
+            print(f"❌ {e}")  # If phone number is invalid, it will print the error
+        except Exception as e:
+            print(f"Unexpected error: {e}")  # Catch any other exceptions
 
     def removeCustomer(self, customerID: int) -> None:
         cursor = self.connection.cursor()
         query = "DELETE FROM customer WHERE customerID = %s"
         cursor.execute(query, (customerID,))
         self.connection.commit()
-        print("✅ Customer removed successfully.")
+        print(" Customer removed successfully.")
 
     def listCustomers(self) -> list:
         cursor = self.connection.cursor()
         query = "SELECT * FROM customer"
         cursor.execute(query)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
 
+        customer_list = []
+        for row in rows:
+            customer = Customer(
+                customerID=row[0],
+                firstName=row[1],
+                lastName=row[2],
+                email=row[3],
+                phoneNumber=row[4],
+                username=row[5],
+                password=row[6]
+            )
+            customer_list.append(customer)
+
+        return customer_list
+
+    from exceptions.CustomerNotFoundException import CustomerNotFoundException
     def findCustomerById(self, customerID: int) -> Customer:
         cursor = self.connection.cursor()
         query = "SELECT * FROM customer WHERE customerID = %s"
         cursor.execute(query, (customerID,))
         row = cursor.fetchone()
-        if row:
-            return Customer(*row)
-        return None
+        if row is None:
+            raise CustomerNotFoundException(f"Customer with ID {customerID} not found.")
+        return Customer(*row[:5])
 
-    # 📜 Lease Management Methods
+    # Lease Management Methods
     def createLease(self, customerID: int, vehicleID: int, startDate: date, endDate: date,
-                    lease_type: str = "DailyLease") -> Lease:
+                    lease_type: str = "DailyLease", status="active") -> Lease:
         cursor = self.connection.cursor()
 
-        query = """INSERT INTO lease (customerID, vehicleID, startDate, endDate, type)
-                   VALUES (%s, %s, %s, %s, %s)"""
+        # These two lines MUST be here
+        self.findCustomerById(customerID)  # Will raise CustomerNotFoundException if not found
+        self.findCarById(vehicleID)  # Will raise CarNotFoundException if not found
 
-        cursor.execute(query, (customerID, vehicleID, startDate, endDate, lease_type))
+        query = """INSERT INTO lease (customerID, vehicleID, startDate, endDate, type, status)
+                   VALUES (%s, %s, %s, %s, %s, %s)"""
+
+        cursor.execute(query, (customerID, vehicleID, startDate, endDate, lease_type, status))
         self.connection.commit()
 
         lease_id = cursor.lastrowid
-        print("✅ Lease created successfully.")
-        return Lease(lease_id, customerID, vehicleID, startDate, endDate, lease_type)
+        print("Lease created successfully.")
+        return Lease(lease_id, customerID, vehicleID, startDate, endDate, lease_type, status)
 
     def returnCar(self, leaseID: int) -> Lease:
         cursor = self.connection.cursor()
 
-        # 1. Mark lease as inactive
-        query = "UPDATE lease SET active = FALSE WHERE leaseID = %s"
+        # 1. Mark lease as completed (instead of inactive)
+        query = "UPDATE lease SET status = 'completed' WHERE leaseID = %s"
         cursor.execute(query, (leaseID,))
 
         # 2. Fetch lease info
         lease = self.findLeaseById(leaseID)
 
-        # 3. Update vehicle status
+        # 3. Update vehicle status to 'available'
         if lease:
             query = "UPDATE vehicle SET status = 'available' WHERE vehicleID = %s"
             cursor.execute(query, (lease.get_vehicleID(),))
 
         self.connection.commit()
-        print("✅ Lease returned and car status updated to available.")
+        print("Lease returned and car status updated to available.")
         return lease
 
     def listActiveLeases(self) -> list:
         cursor = self.connection.cursor()
-        query = "SELECT * FROM lease WHERE active = TRUE"
+        query = "SELECT * FROM lease WHERE status = 'active'"
         cursor.execute(query)
         return cursor.fetchall()
 
-    def listLeaseHistory(self) -> list:
+    def listLeaseHistory(self, customerID=None) -> list:
         cursor = self.connection.cursor()
-        query = "SELECT * FROM lease WHERE active = FALSE"
-        cursor.execute(query)
+
+        # If customerID is provided, fetch their specific lease history.
+        if customerID:
+            query = "SELECT * FROM lease WHERE customerID = %s AND status = 'completed'"
+            cursor.execute(query, (customerID,))
+        else:
+            # Admin view: fetch all completed leases.
+            query = "SELECT * FROM lease WHERE status = 'completed'"
+            cursor.execute(query)
+
         return cursor.fetchall()
+
+    from exceptions.LeaseNotFoundException import LeaseNotFoundException
 
     def findLeaseById(self, leaseID: int) -> Lease:
         cursor = self.connection.cursor()
@@ -152,12 +208,42 @@ class CarLeaseRepositoryImpl(ICarLeaseRepository):
         row = cursor.fetchone()
         if row:
             return Lease(*row)
-        return None
+        else:
+            raise LeaseNotFoundException(f"Lease with ID {leaseID} not found.")
 
-    # 💰 Payment Handling
+    # Payment Handling
     def recordPayment(self, lease: Lease, amount: float) -> None:
         cursor = self.connection.cursor()
-        query = "INSERT INTO payment (leaseID, amount, paymentDate) VALUES (%s, %s, CURDATE())"
-        cursor.execute(query, (lease.get_leaseID(), amount))
+
+        # Validate lease exists
+        cursor.execute("SELECT * FROM Lease WHERE leaseID = %s", (lease.get_leaseID(),))
+        lease_row = cursor.fetchone()
+        if not lease_row:
+            raise LeaseNotFoundException(f"Lease with ID {lease.get_leaseID()} not found.")
+
+        # Fetch car rate
+        vehicle_id = lease.get_vehicleID()
+        cursor.execute("SELECT dailyRate FROM Vehicle WHERE vehicleID = %s", (vehicle_id,))
+        rate_row = cursor.fetchone()
+        if not rate_row:
+            raise Exception(f"Rate for vehicle ID {vehicle_id} not found.")
+        daily_rate = rate_row[0]
+
+        # Calculate number of days
+        start = lease.get_startDate()
+        end = lease.get_endDate()
+        duration = (end - start).days + 1  # Include both start and end dates
+
+        expected_amount = duration * daily_rate
+
+        # Compare expected and entered amount
+        if amount != expected_amount:
+            raise Exception(f"Invalid payment amount. Expected: {expected_amount}, but received: {amount}")
+
+        # Record payment
+        cursor.execute("""
+            INSERT INTO Payment (leaseID, paymentDate, amount)
+            VALUES (%s, CURDATE(), %s)
+        """, (lease.get_leaseID(), amount))
         self.connection.commit()
-        print("✅ Payment recorded successfully.")
+        print("Payment recorded successfully.")
